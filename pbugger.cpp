@@ -29,7 +29,7 @@ public:
 
         if (CreateProcess(
             NULL,           // Application name (NULL to use command line)
-            &cmd_line[0],   // Command line (modifiable)
+            reinterpret_cast<LPSTR>(&cmd_line[0]),   // Command line (modifiable)
             NULL,           // Process security attributes
             NULL,           // Thread security attributes
             FALSE,          // Inherit handles
