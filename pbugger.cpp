@@ -1,6 +1,8 @@
 #include <windows.h>
+#include <tlhelp32.h>
 #include <iostream>
 #include <string>
+#include <vector>
 
 class Debugger {
 public:
@@ -68,6 +70,44 @@ public:
         return h_process;
     }
 
+    HANDLE open_thread(DWORD thread_id) {
+        HANDLE h_thread = OpenThread(THREAD_ALL_ACCESS, FALSE, thread_id);
+
+        if (h_thread != NULL) {
+            return h_thread;
+        } else {
+            std::cout << "[*] Unable to open the thread.\n";
+            return NULL;
+        }
+    }
+
+    std::vector<DWORD> enumerate_threads() {
+        std::vector<DWORD> thread_list;
+
+        // TH32CS_SNAPTHREAD signals that we want togather all the threads currently registered in the snapshot
+        // We don't care about th32ProcessID because we determine whether the thread belongs to our process ourselves
+        HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
+
+        if (snapshot == INVALID_HANDLE_VALUE) {
+            std::cout << "[*] Failed to take snapshot of threads.\n";
+            return thread_list;
+        }
+
+        THREADENTRY32 thread_entry;
+        thread_entry.dwSize = sizeof(THREADENTRY32);
+
+        if (Thread32First(snapshot, &thread_entry)) {
+            do {
+                if (thread_entry.th32OwnerProcessID == pid) {
+                    thread_list.push_back(thread_entry.th32ThreadID);
+                }
+            } while (Thread32Next(snapshot, &thread_entry));
+        }
+
+        CloseHandle(snapshot);
+        return thread_list;
+    }
+
     bool attach(DWORD pid) {
         h_process = open_process(pid);
 
@@ -94,9 +134,6 @@ public:
         DWORD continue_status = DBG_CONTINUE;
 
         if (WaitForDebugEvent(&debug_event, INFINITE)) {
-            std::cout << "Press Enter to continue...\n";
-            std::cin.get();
-            debugger_active = false;
 
             ContinueDebugEvent(
                 debug_event.dwProcessId,
