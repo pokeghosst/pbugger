@@ -12,12 +12,12 @@ public:
         debugger_active = false;
     }
 
-    bool load(const std::wstring& path_to_exe) {
+    bool load(const std::wstring &path_to_exe) {
         // Determines how to create the process
         DWORD creation_flags = DEBUG_PROCESS;
 
-        STARTUPINFO startup_info = { 0 };
-        PROCESS_INFORMATION process_info = { 0 };
+        STARTUPINFO startup_info = {0};
+        PROCESS_INFORMATION process_info = {0};
 
         startup_info.dwFlags = STARTF_USESHOWWINDOW;
         startup_info.wShowWindow = SW_HIDE;
@@ -30,16 +30,16 @@ public:
         std::wstring cmd_line = path_to_exe;
 
         if (CreateProcess(
-            NULL,           // Application name (NULL to use command line)
-            reinterpret_cast<LPSTR>(&cmd_line[0]),   // Command line (modifiable)
-            NULL,           // Process security attributes
-            NULL,           // Thread security attributes
-            FALSE,          // Inherit handles
+            NULL, // Application name (NULL to use command line)
+            reinterpret_cast<LPSTR>(&cmd_line[0]), // Command line (modifiable)
+            NULL, // Process security attributes
+            NULL, // Thread security attributes
+            FALSE, // Inherit handles
             creation_flags, // Creation flags
-            NULL,           // Environment
-            NULL,           // Current directory
-            &startup_info,  // Startup info
-            &process_info   // Process information
+            NULL, // Environment
+            NULL, // Current directory
+            &startup_info, // Startup info
+            &process_info // Process information
         )) {
             std::cout << "[*] We have successfully launched the process!" << std::endl;
             std::cout << "[*] PID: " << process_info.dwProcessId << std::endl;
@@ -58,8 +58,7 @@ public:
             run();
 
             return true;
-        }
-        else {
+        } else {
             std::cout << "[*] Error: 0x" << std::hex << GetLastError() << "\n";
             return false;
         }
@@ -84,7 +83,7 @@ public:
     std::vector<DWORD> enumerate_threads() {
         std::vector<DWORD> thread_list;
 
-        // TH32CS_SNAPTHREAD signals that we want togather all the threads currently registered in the snapshot
+        // TH32CS_SNAPTHREAD signals that we want to gather all the threads currently registered in the snapshot
         // We don't care about th32ProcessID because we determine whether the thread belongs to our process ourselves
         HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
 
@@ -108,6 +107,27 @@ public:
         return thread_list;
     }
 
+    CONTEXT get_thread_context(DWORD thread_id) {
+        CONTEXT context;
+        memset(&context, 0, sizeof(CONTEXT));
+        context.ContextFlags = CONTEXT_FULL | CONTEXT_DEBUG_REGISTERS;
+
+        HANDLE h_thread = open_thread(thread_id);
+        if (h_thread == NULL) {
+            std::cout << "[*] Could not get a handle to the thread.\n";
+            return context; // Returns empty context
+        }
+
+        if (GetThreadContext(h_thread, &context)) {
+            CloseHandle(h_thread);
+            return context;
+        }
+
+        std::cout << "[*] Failed to get thread context.\n";
+        CloseHandle(h_thread);
+        return context;
+    }
+
     bool attach(DWORD pid) {
         h_process = open_process(pid);
 
@@ -116,8 +136,7 @@ public:
             this->pid = pid;
             run();
             return true;
-        }
-        else {
+        } else {
             std::cout << "[*] Unable to attach to the process.\n";
             return false;
         }
@@ -130,11 +149,10 @@ public:
     }
 
     void get_debug_event() {
-        DEBUG_EVENT debug_event = { 0 };
+        DEBUG_EVENT debug_event = {0};
         DWORD continue_status = DBG_CONTINUE;
 
         if (WaitForDebugEvent(&debug_event, INFINITE)) {
-
             ContinueDebugEvent(
                 debug_event.dwProcessId,
                 debug_event.dwThreadId,
@@ -147,8 +165,7 @@ public:
         if (DebugActiveProcessStop(pid)) {
             std::cout << "[*] Finished debugging. Exiting...\n";
             return true;
-        }
-        else {
+        } else {
             std::cout << "There was an error\n";
             return false;
         }
